@@ -19,7 +19,16 @@ export function RoomQrCard({
         }
       `}</style>
 
-      <PrintButton />
+      <div className="no-print flex gap-3">
+        <PrintButton />
+        <a
+          href={`${imageSrc}?download=true`}
+          download={`room-${roomNumber}-qr-card.png`}
+          className="rounded-md border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow hover:bg-slate-50"
+        >
+          Download Image (PNG)
+        </a>
+      </div>
 
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

@@ -17,6 +17,12 @@ import { PT_SERIF_BOLD_BASE64, PT_SANS_BOLD_BASE64 } from '@/assets/qr-card-font
 const TEMPLATE_BUFFER = Buffer.from(QR_CARD_TEMPLATE_BASE64, 'base64')
 const TEMPLATE_WIDTH = 1024
 const TEMPLATE_HEIGHT = 1536
+// 1024x1536px is a 4x6in card only at this density. sharp defaults PNG
+// output to 72 DPI density metadata (unrelated to pixel dimensions), so
+// without setting this explicitly the file's pixels are right but printing
+// it "at actual size" (Preview, Photoshop, most photo-printing software)
+// yields ~14.2x21.3in instead of 4x6in.
+const TEMPLATE_DPI = 256
 
 /**
  * Vercel's Node.js runtime (AWS Lambda under the hood) ships zero fonts —
@@ -296,5 +302,6 @@ export async function generateRoomQrCardImage({
       { input: qrResized, left: QR_BOX.left, top: QR_BOX.top },
     ])
     .png()
+    .withMetadata({ density: TEMPLATE_DPI })
     .toBuffer()
 }
