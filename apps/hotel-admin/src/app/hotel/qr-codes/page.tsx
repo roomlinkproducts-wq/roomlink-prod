@@ -18,6 +18,7 @@ export default async function QrCodesPage() {
           room_number: r.room_number,
           floor: r.floor,
           building: r.buildings?.name ?? null,
+          status: r.status,
           qr_codes: r.qr_codes.map((q) => ({
             qr_code_id: q.qr_code_id,
             is_active: q.is_active,

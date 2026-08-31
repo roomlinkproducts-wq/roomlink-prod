@@ -21,6 +21,11 @@ export function floorLabel(floor: number | null): string {
   return floor === null ? '—' : String(floor)
 }
 
+/** Stable string key for a normalized floor, safe to round-trip through a URL query param. */
+export function floorKey(floor: number | null): string {
+  return floor === null ? 'unassigned' : String(floor)
+}
+
 /** Groups by normalizeFloor(item.floor), sorted ascending with unassigned/unparseable floors last. */
 export function groupByFloor<T extends { floor: string | null }>(items: T[]): FloorGroup<T>[] {
   const map = new Map<number | null, T[]>()

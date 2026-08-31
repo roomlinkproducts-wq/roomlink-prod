@@ -96,3 +96,32 @@ export async function getQrCodeForRoom(hotelId: string, qrCodeId: string) {
     include: { rooms: { select: { room_number: true, hotel_id: true } } },
   })
 }
+
+/**
+ * Bulk "Generate All" for a floor/building selection — only creates a QR for
+ * rooms that don't already have an active one, so it never invalidates an
+ * already-installed sticker just because it's re-run over a mixed floor.
+ */
+export async function bulkGenerateQrCodes(hotelId: string, roomIds: string[], actor: HotelSessionUser) {
+  const rooms = await prisma.rooms.findMany({
+    where: { room_id: { in: roomIds }, hotel_id: hotelId },
+    select: { room_id: true, qr_codes: { where: { is_active: true }, select: { qr_code_id: true } } },
+  })
+
+  const toGenerate = rooms.filter((room) => room.qr_codes.length === 0)
+  for (const room of toGenerate) {
+    await generateQrCode(hotelId, room.room_id, actor)
+  }
+
+  return { generated: toGenerate.length, skipped: rooms.length - toGenerate.length }
+}
+
+/** Every currently-active QR for the hotel, with enough room/building info to group by building + floor for the bulk ZIP download. */
+export async function listActiveQrCodesForHotel(hotelId: string) {
+  return prisma.qr_codes.findMany({
+    where: { is_active: true, rooms: { hotel_id: hotelId } },
+    include: {
+      rooms: { select: { room_id: true, room_number: true, floor: true, buildings: { select: { name: true } } } },
+    },
+  })
+}

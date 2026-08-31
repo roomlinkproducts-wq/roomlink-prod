@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, Select, StatusBadge } from '@roomlink/ui'
-import { groupByBuilding, groupByFloor, floorLabel } from '@/lib/floor'
+import { groupByBuilding, groupByFloor, floorLabel, floorKey } from '@/lib/floor'
 import { Pager } from '@/components/pager'
 
 type Room = {
@@ -176,7 +176,7 @@ export function RoomList({ rooms, hotelName, isNative = false }: { rooms: Room[]
       {floorGroups.length > 1 && (
         <div className="border-t border-slate-100 pt-4">
           <Pager
-            items={floorGroups.map((g) => ({ key: g.floor === null ? 'unassigned' : String(g.floor), label: floorLabel(g.floor) }))}
+            items={floorGroups.map((g) => ({ key: floorKey(g.floor), label: floorLabel(g.floor) }))}
             currentIndex={currentFloorPage}
             onSelect={setFloorPage}
           />

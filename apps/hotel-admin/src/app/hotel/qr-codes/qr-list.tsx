@@ -3,15 +3,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, Button } from '@roomlink/ui'
-import { floorLabel, groupByBuilding, groupByFloor } from '@/lib/floor'
+import { floorKey, floorLabel, groupByBuilding, groupByFloor } from '@/lib/floor'
 import { Pager } from '@/components/pager'
 
 type QrCode = { qr_code_id: string; is_active: boolean; installed_at: string | null }
-type Room = { room_id: string; room_number: string; floor: string | null; building: string | null; qr_codes: QrCode[] }
+type Room = {
+  room_id: string
+  room_number: string
+  floor: string | null
+  building: string | null
+  status: string
+  qr_codes: QrCode[]
+}
 
 export function QrList({ rooms, hotelName }: { rooms: Room[]; hotelName: string }) {
   const router = useRouter()
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [bulkBusy, setBulkBusy] = useState(false)
   const [buildingPage, setBuildingPage] = useState(0)
   const [floorPage, setFloorPage] = useState(0)
 
@@ -29,6 +37,27 @@ export function QrList({ rooms, hotelName }: { rooms: Room[]; hotelName: string 
   useEffect(() => {
     setFloorPage(0)
   }, [currentBuildingPage])
+
+  // "Generate All" for a floor stays disabled once every room on it already
+  // has an active QR — it only unlocks again once the whole floor has been
+  // taken offline (every room deactivated), so it can't be used to
+  // accidentally clobber QR codes already printed and installed.
+  const floorRooms = currentFloor?.items ?? []
+  const floorAllGenerated = floorRooms.length > 0 && floorRooms.every((r) => r.qr_codes.some((q) => q.is_active))
+  const floorAllDeactivated = floorRooms.length > 0 && floorRooms.every((r) => r.status === 'inactive')
+  const generateAllDisabled = bulkBusy || floorRooms.length === 0 || (floorAllGenerated && !floorAllDeactivated)
+  const floorHasAnyQr = floorRooms.some((r) => r.qr_codes.some((q) => q.is_active))
+
+  async function bulkGenerate() {
+    if (!currentBuilding || !currentFloor) return
+    setBulkBusy(true)
+    await fetch(
+      `/api/v1/hotel/qr-codes/bulk-generate?building=${encodeURIComponent(currentBuilding.building)}&floor=${floorKey(currentFloor.floor)}`,
+      { method: 'POST' }
+    )
+    setBulkBusy(false)
+    router.refresh()
+  }
 
   async function generate(roomId: string, regenerate: boolean) {
     setBusyId(roomId)
@@ -62,10 +91,25 @@ export function QrList({ rooms, hotelName }: { rooms: Room[]; hotelName: string 
       )}
 
       {currentFloor && (
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          {currentBuilding && buildingGroups.length > 1 ? `${currentBuilding.building} · ` : ''}
-          {currentFloor.floor === null ? 'Unassigned' : `Floor ${currentFloor.floor}`} ({currentFloor.items.length})
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {currentBuilding && buildingGroups.length > 1 ? `${currentBuilding.building} · ` : ''}
+            {currentFloor.floor === null ? 'Unassigned' : `Floor ${currentFloor.floor}`} ({floorRooms.length})
+          </h3>
+          <div className="flex gap-2">
+            <Button variant="secondary" className="h-8 px-3 text-xs" disabled={generateAllDisabled} onClick={bulkGenerate}>
+              {bulkBusy ? 'Generating…' : 'Generate All QR Codes'}
+            </Button>
+            {floorHasAnyQr && currentBuilding && (
+              <a
+                href={`/api/v1/hotel/qr-codes/bulk-download?building=${encodeURIComponent(currentBuilding.building)}&floor=${floorKey(currentFloor.floor)}`}
+                className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Download All (ZIP)
+              </a>
+            )}
+          </div>
+        </div>
       )}
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
@@ -79,7 +123,7 @@ export function QrList({ rooms, hotelName }: { rooms: Room[]; hotelName: string 
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {(currentFloor?.items ?? []).map((room) => {
+              {floorRooms.map((room) => {
                 const active = room.qr_codes.find((q) => q.is_active)
                 return (
                   <tr key={room.room_id} className="hover:bg-slate-50">
@@ -162,7 +206,7 @@ export function QrList({ rooms, hotelName }: { rooms: Room[]; hotelName: string 
       {floorGroups.length > 1 && (
         <div className="pt-2">
           <Pager
-            items={floorGroups.map((g) => ({ key: g.floor === null ? 'unassigned' : String(g.floor), label: floorLabel(g.floor) }))}
+            items={floorGroups.map((g) => ({ key: floorKey(g.floor), label: floorLabel(g.floor) }))}
             currentIndex={currentFloorPage}
             onSelect={setFloorPage}
           />

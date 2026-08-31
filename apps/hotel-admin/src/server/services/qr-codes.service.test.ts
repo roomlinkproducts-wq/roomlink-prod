@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { generateQrCode, buildRoomQrUrl } from './qr-codes.service'
+import { generateQrCode, bulkGenerateQrCodes, buildRoomQrUrl } from './qr-codes.service'
 import { ConfigurationError } from '@/server/errors'
 
 const mockPrisma = vi.hoisted(() => ({
-  rooms: { findFirstOrThrow: vi.fn() },
+  rooms: { findFirstOrThrow: vi.fn(), findMany: vi.fn() },
   qr_codes: { updateMany: vi.fn(), create: vi.fn() },
   audit_logs: { create: vi.fn() },
   onboarding_tracker: { updateMany: vi.fn() },
@@ -37,6 +37,23 @@ describe('generateQrCode', () => {
     const createArgs = mockPrisma.qr_codes.create.mock.calls[0][0]
     expect(createArgs.data.code_value).toMatch(/^[0-9a-f]{32}$/)
     expect(createArgs.data.room_id).toBe('room-1')
+  })
+})
+
+describe('bulkGenerateQrCodes', () => {
+  it('only generates for rooms that do not already have an active QR', async () => {
+    mockPrisma.rooms.findMany.mockResolvedValue([
+      { room_id: 'room-1', qr_codes: [] },
+      { room_id: 'room-2', qr_codes: [{ qr_code_id: 'qr-existing' }] },
+      { room_id: 'room-3', qr_codes: [] },
+    ])
+
+    const result = await bulkGenerateQrCodes('hotel-1', ['room-1', 'room-2', 'room-3'], ACTOR)
+
+    expect(mockPrisma.rooms.findFirstOrThrow).toHaveBeenCalledTimes(2)
+    expect(mockPrisma.rooms.findFirstOrThrow).toHaveBeenCalledWith({ where: { room_id: 'room-1', hotel_id: 'hotel-1' } })
+    expect(mockPrisma.rooms.findFirstOrThrow).toHaveBeenCalledWith({ where: { room_id: 'room-3', hotel_id: 'hotel-1' } })
+    expect(result).toEqual({ generated: 2, skipped: 1 })
   })
 })
 
