@@ -14,7 +14,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
  *    alias for the host machine's localhost.
  *  - A physical device: your machine's LAN IP, e.g. `http://192.168.1.23:3001`.
  *  - Production / store builds: the real deployed HTTPS URL —
- *    `https://dev2.roomlink.in`. Use the `:prod` scripts in this package
+ *    `https://hotel.roomlink.in`. Use the `:prod` scripts in this package
  *    (`sync:prod`, `run:android:prod`, `run:ios:prod`) rather than the plain
  *    ones — `cap run`/`cap open` each re-run `cap sync` themselves, so the
  *    env var has to be set on every invocation, not just once. No safe

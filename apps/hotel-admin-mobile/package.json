@@ -7,11 +7,11 @@
     "add:ios": "cap add ios",
     "add:android": "cap add android",
     "sync": "cap sync",
-    "sync:prod": "CAPACITOR_SERVER_URL=https://dev2.roomlink.in cap sync",
+    "sync:prod": "CAPACITOR_SERVER_URL=https://hotel.roomlink.in cap sync",
     "open:ios": "cap open ios",
     "open:android": "cap open android",
-    "run:android:prod": "CAPACITOR_SERVER_URL=https://dev2.roomlink.in cap run android",
-    "run:ios:prod": "CAPACITOR_SERVER_URL=https://dev2.roomlink.in cap run ios"
+    "run:android:prod": "CAPACITOR_SERVER_URL=https://hotel.roomlink.in cap run android",
+    "run:ios:prod": "CAPACITOR_SERVER_URL=https://hotel.roomlink.in cap run ios"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",

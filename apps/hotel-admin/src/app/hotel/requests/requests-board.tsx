@@ -33,6 +33,10 @@ type SortBy = 'oldest' | 'newest' | 'priority' | 'sla'
 const PRIORITY_RANK: Record<string, number> = { urgent: 3, high: 2, normal: 1 }
 const SLA_RISK_MINUTES: Record<string, number> = { urgent: 15, high: 30, normal: 60 }
 const OPEN_STATUSES = new Set(['pending', 'pending_acceptance', 'assigned', 'in_progress', 'escalated'])
+// Reception (or anyone else with manage rights) can close a request directly from any of these
+// states — resolving it at the desk doesn't require walking it through start/in-progress first.
+// `pending_acceptance` is excluded: that state has its own accept/reject flow to resolve first.
+const CLOSABLE_STATUSES = new Set(['pending', 'assigned', 'in_progress', 'escalated'])
 
 function elapsedMinutes(createdAt: string) {
   return (Date.now() - new Date(createdAt).getTime()) / 60000
@@ -419,14 +423,14 @@ export function RequestsBoard({
                             Start
                           </Button>
                         )}
-                        {r.status === 'in_progress' && (
+                        {CLOSABLE_STATUSES.has(r.status) && (
                           <Button
                             variant="secondary"
                             className="h-7 px-2 text-xs"
                             disabled={busyId === r.request_id}
                             onClick={() => setStatus(r.request_id, 'completed')}
                           >
-                            Complete
+                            Close
                           </Button>
                         )}
                         {OPEN_STATUSES.has(r.status) && r.status !== 'escalated' && (
