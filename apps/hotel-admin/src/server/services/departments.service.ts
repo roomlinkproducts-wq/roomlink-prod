@@ -156,6 +156,10 @@ export async function setDepartmentManager(
     afterState: { manager_id: managerId },
   })
 
+  if (managerId) {
+    await markStepComplete(hotelId, 'Department Managers')
+  }
+
   return prisma.departments.findUniqueOrThrow({
     where: { department_id: departmentId },
     include: { users: { select: { user_id: true, full_name: true } } },

@@ -22,6 +22,7 @@ import {
   Sparkles,
   BedDouble,
   Phone,
+  BarChart3,
 } from 'lucide-react'
 import { cn } from '@roomlink/ui'
 
@@ -47,6 +48,7 @@ const FULL_NAV_ITEMS = [
     icon: Activity,
     group: ['/hotel/activity', '/hotel/notifications', '/hotel/guest-sessions'],
   },
+  { href: '/hotel/reports', label: 'Reports', icon: BarChart3 },
   { href: '/hotel/subscription', label: 'Subscription', icon: CreditCard },
   { href: '/hotel/settings', label: 'Settings', icon: Settings },
 ]

@@ -219,6 +219,7 @@ model hotels {
   onboarding_tracker                          onboarding_tracker[]
   orders                                      orders[]
   requests                                    requests[]
+  request_reminders                           request_reminders[]
   roles                                       roles[]
   room_types                                  room_types[]
   rooms                                       rooms[]
@@ -417,6 +418,9 @@ model requests {
   created_at             DateTime                 @default(now()) @db.Timestamptz(6)
   started_at             DateTime?                @db.Timestamptz(6)
   completed_at           DateTime?                @db.Timestamptz(6)
+  accepted_at            DateTime?                @db.Timestamptz(6)
+  cancelled_at           DateTime?                @db.Timestamptz(6)
+  status_changed_at      DateTime                 @default(now()) @db.Timestamptz(6)
   users                  users?                   @relation(fields: [assigned_to], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
   departments            departments?             @relation(fields: [department_id], references: [department_id], onDelete: NoAction, onUpdate: NoAction)
   guests                 guests?                  @relation(fields: [guest_id], references: [guest_id], onDelete: NoAction, onUpdate: NoAction)
@@ -424,6 +428,7 @@ model requests {
   hotels                 hotels                   @relation(fields: [hotel_id], references: [hotel_id], onDelete: Cascade, onUpdate: NoAction)
   rooms                  rooms?                   @relation(fields: [room_id], references: [room_id], onDelete: NoAction, onUpdate: NoAction)
   request_status_history request_status_history[]
+  request_reminders      request_reminders[]
 
   @@index([hotel_id, status], map: "idx_requests_hotel_status")
   @@index([guest_session_id], map: "idx_requests_guest_session")
@@ -447,6 +452,29 @@ model request_status_history {
   users_request_status_history_to_assigneeTousers users?          @relation("request_status_history_to_assigneeTousers", fields: [to_assignee], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([request_id], map: "idx_request_status_history_request")
+}
+
+/// One row per overdue reminder sent to reception for a still-open request.
+/// `sequence` (1, 2, 3…) is unique per request, which is what makes the
+/// reminder sweep safe to run concurrently from several polling tabs.
+model request_reminders {
+  reminder_id     String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hotel_id        String         @db.Uuid
+  request_id      String         @db.Uuid
+  sequence        Int
+  status_at_send  request_status
+  open_minutes    Int
+  status_minutes  Int
+  sent_at         DateTime       @default(now()) @db.Timestamptz(6)
+  acknowledged_by String?        @db.Uuid
+  acknowledged_at DateTime?      @db.Timestamptz(6)
+  hotels          hotels         @relation(fields: [hotel_id], references: [hotel_id], onDelete: Cascade, onUpdate: NoAction)
+  requests        requests       @relation(fields: [request_id], references: [request_id], onDelete: Cascade, onUpdate: NoAction)
+  users           users?         @relation(fields: [acknowledged_by], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([request_id, sequence])
+  @@index([hotel_id, acknowledged_at], map: "idx_request_reminders_hotel_ack")
+  @@index([hotel_id, sent_at], map: "idx_request_reminders_hotel_sent_at")
 }
 
 model role_permissions {
@@ -626,6 +654,7 @@ model users {
   departments_managed                                                 departments[]
   request_status_history_request_status_history_changed_byTousers     request_status_history[] @relation("request_status_history_changed_byTousers")
   request_status_history_request_status_history_to_assigneeTousers    request_status_history[] @relation("request_status_history_to_assigneeTousers")
+  request_reminders_acknowledged                                      request_reminders[]
   support_tickets_support_tickets_assigned_toTousers                  support_tickets[]        @relation("support_tickets_assigned_toTousers")
   support_tickets_support_tickets_raised_byTousers                    support_tickets[]        @relation("support_tickets_raised_byTousers")
   ticket_messages                                                     ticket_messages[]

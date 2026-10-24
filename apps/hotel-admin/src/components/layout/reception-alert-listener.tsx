@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bell, BellOff, ClipboardList, MessageSquareText, UserCheck, X } from 'lucide-react'
+import { OverdueReminderPanel, type OverdueReminder } from './overdue-reminder-panel'
 
 type Signal = {
   latestRequestId: string | null
@@ -18,6 +19,7 @@ type Signal = {
   staffActivityRequestType: string | null
   staffActivityRoomNumber: string | null
   staffActivityStaffName: string | null
+  overdueReminders: OverdueReminder[]
 }
 
 type Alert =
@@ -64,6 +66,15 @@ async function fetchSignal(): Promise<Signal> {
   return res.json()
 }
 
+async function postAcknowledge(requestId: string | null) {
+  const res = await fetch('/api/v1/hotel/reception/reminders/ack', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requestId }),
+  })
+  if (!res.ok) throw new Error(`Failed to acknowledge reminder (${res.status})`)
+}
+
 /** One-shot ascending chime (Web Audio API) — distinct from the voice-call Ringtone, which loops. */
 function playChime() {
   const ctx = new AudioContext()
@@ -104,6 +115,10 @@ export function ReceptionAlertListener({ enabled }: { enabled: boolean }) {
   const lastSeenRequestIdRef = useRef<string | null | undefined>(undefined)
   const lastSeenMessageIdRef = useRef<string | null | undefined>(undefined)
   const lastSeenStaffActivityIdRef = useRef<string | null | undefined>(undefined)
+  // Every reminder id seen so far (undefined until the first poll's baseline),
+  // so a *new* reminder chimes once but an outstanding one doesn't re-chime every poll.
+  const seenReminderIdsRef = useRef<Set<string> | undefined>(undefined)
+  const [reminders, setReminders] = useState<OverdueReminder[]>([])
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [alert, setAlert] = useState<Alert | null>(null)
   const [muted, setMuted] = useState(false)
@@ -165,6 +180,15 @@ export function ReceptionAlertListener({ enabled }: { enabled: boolean }) {
       lastSeenMessageIdRef.current = signal.latestGuestMessageId
       lastSeenStaffActivityIdRef.current = signal.latestStaffActivityId
 
+      const overdue = signal.overdueReminders ?? []
+      const seenReminders = seenReminderIdsRef.current
+      const hasNewReminder = seenReminders !== undefined && overdue.some((r) => !seenReminders.has(r.reminderId))
+      const nextSeen = new Set(seenReminders)
+      for (const r of overdue) nextSeen.add(r.reminderId)
+      seenReminderIdsRef.current = nextSeen
+      setReminders(overdue)
+      if (hasNewReminder && !mutedRef.current) playChime()
+
       // A request arriving takes priority when more than one changes in the
       // same poll window; the chime already fired either way, and whatever
       // gets dropped here is still there (and still "new") on the next poll.
@@ -192,7 +216,20 @@ export function ReceptionAlertListener({ enabled }: { enabled: boolean }) {
     }
   }, [enabled, router, dismiss])
 
+  const acknowledge = useCallback((requestId: string | null) => {
+    // Optimistic: the next poll re-syncs with the server either way.
+    setReminders((prev) => (requestId ? prev.filter((r) => r.requestId !== requestId) : []))
+    postAcknowledge(requestId).catch((error) => console.error('[reception-alert-listener] acknowledge failed', error))
+  }, [])
+
+  const openReminder = useCallback(
+    (r: OverdueReminder) => router.push(`/hotel/requests${r.roomNumber ? `?q=${encodeURIComponent(r.roomNumber)}` : ''}`),
+    [router]
+  )
+
   if (!enabled) return null
+
+  const reminderPanel = <OverdueReminderPanel reminders={reminders} onOpen={openReminder} onAcknowledge={acknowledge} />
 
   const muteToggle = (
     <button
@@ -206,7 +243,13 @@ export function ReceptionAlertListener({ enabled }: { enabled: boolean }) {
     </button>
   )
 
-  if (!alert) return muteToggle
+  if (!alert)
+    return (
+      <>
+        {muteToggle}
+        {reminderPanel}
+      </>
+    )
 
   const href =
     alert.kind === 'request'
@@ -238,6 +281,7 @@ export function ReceptionAlertListener({ enabled }: { enabled: boolean }) {
   return (
     <>
       {muteToggle}
+      {reminderPanel}
       <div className="fixed right-4 top-4 z-50 w-full max-w-sm">
         <button
           type="button"

@@ -15,6 +15,7 @@ import {
   UtensilsCrossed,
   Sparkles,
   BedDouble,
+  BarChart3,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -50,6 +51,7 @@ const HOTEL_ADMIN_ITEMS: MobileNavItem[] = [
     icon: Activity,
     group: ['/hotel/activity', '/hotel/notifications', '/hotel/guest-sessions'],
   },
+  { href: '/hotel/reports', label: 'Reports', icon: BarChart3 },
   { href: '/hotel/subscription', label: 'Subscription', icon: CreditCard },
   { href: '/hotel/settings', label: 'Settings', icon: Settings },
 ]

@@ -282,7 +282,11 @@ export async function assignRequest(hotelId: string, requestId: string, assignee
   const after = await prisma.$transaction(async (tx) => {
     const updated = await tx.requests.update({
       where: { request_id: requestId },
-      data: { assigned_to: assigneeId, status: nextStatus },
+      data: {
+        assigned_to: assigneeId,
+        status: nextStatus,
+        status_changed_at: nextStatus !== request.status ? new Date() : undefined,
+      },
     })
     await tx.request_status_history.create({
       data: {
@@ -346,7 +350,7 @@ export async function acceptRequest(hotelId: string, requestId: string, actor: H
     // overwritten assignment.
     const result = await tx.requests.updateMany({
       where: { request_id: requestId, hotel_id: hotelId, status: 'pending' },
-      data: { assigned_to: actor.id, status: 'assigned' },
+      data: { assigned_to: actor.id, status: 'assigned', accepted_at: new Date(), status_changed_at: new Date() },
     })
     if (result.count === 0) return null
 
@@ -395,7 +399,11 @@ export async function acceptAssignment(hotelId: string, requestId: string, actor
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.requests.update({ where: { request_id: requestId }, data: { status: 'assigned' } })
+    const now = new Date()
+    await tx.requests.update({
+      where: { request_id: requestId },
+      data: { status: 'assigned', accepted_at: now, status_changed_at: now },
+    })
     await tx.request_status_history.create({
       data: { request_id: requestId, from_status: 'pending_acceptance', to_status: 'assigned', changed_by: actor.id },
     })
@@ -429,7 +437,7 @@ export async function rejectAssignment(hotelId: string, requestId: string, reaso
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.requests.update({ where: { request_id: requestId }, data: { status: 'pending', assigned_to: null } })
+    await tx.requests.update({ where: { request_id: requestId }, data: { status: 'pending', assigned_to: null, status_changed_at: new Date() } })
     await tx.request_status_history.create({
       data: {
         request_id: requestId,
@@ -487,6 +495,8 @@ export async function updateRequestStatus(
         status: input.status,
         started_at: input.status === 'in_progress' && !request.started_at ? now : undefined,
         completed_at: input.status === 'completed' ? now : undefined,
+        cancelled_at: input.status === 'cancelled' ? now : undefined,
+        status_changed_at: now,
       },
     })
     await tx.request_status_history.create({
@@ -520,7 +530,10 @@ export async function escalateRequest(hotelId: string, requestId: string, input:
   const note = `[Urgency: ${input.urgency} | To: ${input.recipient === 'gm' ? 'Hotel Admin/GM' : 'Reception'}] ${input.reason}`
 
   const after = await prisma.$transaction(async (tx) => {
-    const updated = await tx.requests.update({ where: { request_id: requestId }, data: { status: 'escalated' } })
+    const updated = await tx.requests.update({
+      where: { request_id: requestId },
+      data: { status: 'escalated', status_changed_at: new Date() },
+    })
     await tx.request_status_history.create({
       data: { request_id: requestId, from_status: request.status, to_status: 'escalated', changed_by: actor.id, note },
     })

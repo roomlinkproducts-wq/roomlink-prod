@@ -42,6 +42,14 @@ function elapsedMinutes(createdAt: string) {
   return (Date.now() - new Date(createdAt).getTime()) / 60000
 }
 
+// Mirrors SERVICE_STANDARD_MINUTES (server/sla.ts): the hotel-wide "close within 30 min" standard that
+// reception reminders and the service report use, independent of the per-priority SLA risk ordering above.
+const SERVICE_STANDARD_MINUTES = 30
+
+function isOverdue(r: RequestRow) {
+  return OPEN_STATUSES.has(r.status) && elapsedMinutes(r.created_at) >= SERVICE_STANDARD_MINUTES
+}
+
 function isAtSlaRisk(r: RequestRow) {
   if (!OPEN_STATUSES.has(r.status)) return false
   return elapsedMinutes(r.created_at) >= (SLA_RISK_MINUTES[r.priority] ?? 60)
@@ -381,6 +389,9 @@ export function RequestsBoard({
                     <td className="px-5 py-3">
                       <span className={atRisk ? 'font-medium text-red-600' : 'text-slate-500'}>{timeAgo(r.created_at)}</span>
                       {atRisk && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" aria-label="At SLA risk" />}
+                      {isOverdue(r) && (
+                        <span className="ml-1.5 rounded bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-red-700">Overdue</span>
+                      )}
                     </td>
                     <td className="px-5 py-3">
                       {assigneesFor === r.request_id ? (
