@@ -39,6 +39,9 @@ export async function goLive(hotelId: string, actor: HotelSessionUser) {
     data: { status: 'trial' },
   })
 
+  // "Review" has no domain page of its own — confirming Go Live is the review.
+  await markStepComplete(hotelId, 'Review')
+
   await recordAudit({
     actorId: actor.id,
     actorType: actor.userType,

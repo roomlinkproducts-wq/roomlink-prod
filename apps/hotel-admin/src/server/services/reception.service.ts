@@ -1,6 +1,7 @@
 import { prisma } from '@/server/db'
 import { isAtSlaRisk } from '@/server/sla'
 import { ForbiddenError } from '@/server/hotel-rbac'
+import { listOpenReminders, maybeRunReminderSweep } from '@/server/services/sla-reminders.service'
 import type { HotelSessionUser } from '@/server/require-hotel-session'
 
 /**
@@ -225,7 +226,10 @@ export async function getRoomOverview(hotelId: string, actor: HotelSessionUser) 
  */
 export async function getNewestRequestSignal(hotelId: string, actor: HotelSessionUser) {
   requireReceptionOrAdmin(actor)
-  const [latestRequest, latestGuestMessage, latestStaffActivity] = await Promise.all([
+  // This poll is the only thing that runs on a timer here, so it also drives
+  // the overdue-reminder sweep (throttled inside; see sla-reminders.service.ts).
+  await maybeRunReminderSweep(hotelId)
+  const [latestRequest, latestGuestMessage, latestStaffActivity, overdueReminders] = await Promise.all([
     prisma.requests.findFirst({
       where: { hotel_id: hotelId },
       orderBy: { created_at: 'desc' },
@@ -262,6 +266,7 @@ export async function getNewestRequestSignal(hotelId: string, actor: HotelSessio
         users_request_status_history_changed_byTousers: { select: { full_name: true } },
       },
     }),
+    listOpenReminders(hotelId),
   ])
 
   return {
@@ -278,6 +283,7 @@ export async function getNewestRequestSignal(hotelId: string, actor: HotelSessio
     staffActivityRequestType: latestStaffActivity?.requests.request_type ?? null,
     staffActivityRoomNumber: latestStaffActivity?.requests.rooms?.room_number ?? null,
     staffActivityStaffName: latestStaffActivity?.users_request_status_history_changed_byTousers?.full_name ?? null,
+    overdueReminders,
   }
 }
 

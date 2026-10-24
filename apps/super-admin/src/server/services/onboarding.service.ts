@@ -15,7 +15,8 @@ const STALLED_THRESHOLD_HOURS = 48
 
 export async function listOnboardingStatus(): Promise<OnboardingRow[]> {
   const hotels = await prisma.hotels.findMany({
-    where: { status: { in: ['onboarding', 'trial', 'pending'] } },
+    // 'trial' is excluded: Go Live flips onboarding → trial, so a trial hotel is already live.
+    where: { status: { in: ['onboarding', 'pending'] } },
     orderBy: { created_at: 'desc' },
     include: {
       onboarding_tracker: { orderBy: { step_order: 'asc' } },
